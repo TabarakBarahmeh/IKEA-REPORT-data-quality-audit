@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IKEA Sales Data — تقرير جودة البيانات</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10; --surface: #111318; --surface2: #1a1e26; --border: #232830;
+    --ikea-blue: #003087; --ikea-yellow: #FFDA1A;
+    --red: #e84343; --orange: #f5a623; --green: #2dce72; --blue: #4a9eff;
+    --text: #e8ecf0; --text-dim: #7a8494; --text-muted: #454d5c;
+    --mono: 'JetBrains Mono', monospace; --sans: 'IBM Plex Sans Arabic', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; }
+ 
+  .header { background: linear-gradient(135deg, var(--ikea-blue) 0%, #001d5c 100%); padding: 40px 60px 36px; position: relative; overflow: hidden; border-bottom: 3px solid var(--ikea-yellow); }
+  .header::before { content: ''; position: absolute; top: -60px; left: -60px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,218,26,0.12) 0%, transparent 70%); border-radius: 50%; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .ikea-badge { background: var(--ikea-yellow); color: var(--ikea-blue); font-weight: 700; font-size: 22px; padding: 8px 20px; border-radius: 4px; letter-spacing: 3px; }
+  .report-meta { text-align: left; font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.5); }
+  .report-meta span { display: block; }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .header p { color: rgba(255,255,255,0.65); font-size: 13px; }
+ 
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 40px 80px; }
+ 
+  .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 48px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 16px; position: relative; overflow: hidden; }
+  .kpi-card::before { content: ''; position: absolute; top: 0; right: 0; width: 3px; height: 100%; background: var(--card-color, #444); }
+  .kpi-value { font-size: 32px; font-weight: 700; color: var(--card-color, var(--ikea-yellow)); font-family: var(--mono); line-height: 1; margin-bottom: 6px; }
+  .kpi-label { font-size: 11px; color: var(--text-dim); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-family: var(--mono); }
+ 
+  .section { margin-bottom: 40px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .section-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .section-title { font-size: 17px; font-weight: 600; }
+  .section-count { margin-right: auto; background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); font-size: 11px; font-family: var(--mono); padding: 2px 10px; border-radius: 20px; }
+  .severity-badge { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sev-critical { background: rgba(232,67,67,0.15); color: var(--red); border: 1px solid rgba(232,67,67,0.3); }
+  .sev-warning  { background: rgba(245,166,35,0.15); color: var(--orange); border: 1px solid rgba(245,166,35,0.3); }
+  .sev-info     { background: rgba(45,206,114,0.12); color: var(--green); border: 1px solid rgba(45,206,114,0.25); }
+  .sev-clean    { background: rgba(74,158,255,0.12); color: var(--blue); border: 1px solid rgba(74,158,255,0.25); }
+ 
+  .issue-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .issue-card-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; transition: background 0.15s; }
+  .issue-card-header:hover { background: rgba(255,255,255,0.03); }
+  .issue-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-red    { background: var(--red);    box-shadow: 0 0 6px rgba(232,67,67,0.5); }
+  .dot-orange { background: var(--orange); box-shadow: 0 0 6px rgba(245,166,35,0.4); }
+  .dot-blue   { background: var(--blue);   box-shadow: 0 0 6px rgba(74,158,255,0.4); }
+  .issue-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .issue-count-badge { font-family: var(--mono); font-size: 13px; font-weight: 600; background: var(--surface2); padding: 2px 10px; border-radius: 6px; color: var(--text-dim); }
+  .issue-toggle { color: var(--text-muted); font-size: 12px; transition: transform 0.2s; }
+  .issue-toggle.open { transform: rotate(180deg); }
+  .issue-body { padding: 0 18px 18px; border-top: 1px solid var(--border); display: none; }
+  .issue-body.open { display: block; }
+  .issue-desc { color: var(--text-dim); font-size: 13px; padding: 12px 0 14px; line-height: 1.65; }
+ 
+  .data-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .data-table th { background: var(--surface2); color: var(--text-dim); font-weight: 600; text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: var(--sans); font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+  .data-table td { padding: 8px 12px; border-bottom: 1px solid rgba(35,40,48,0.7); color: var(--text); vertical-align: middle; white-space: nowrap; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .val-bad  { color: var(--red); font-weight: 600; }
+  .val-warn { color: var(--orange); }
+  .val-ok   { color: var(--green); }
+  .val-muted { color: var(--text-muted); }
+ 
+  .clean-box { background: rgba(45,206,114,0.06); border: 1px solid rgba(45,206,114,0.2); border-radius: 10px; padding: 14px 18px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
+  .clean-text { font-size: 13px; color: var(--green); font-weight: 500; }
+  .clean-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+ 
+  .rec-box { background: var(--surface); border: 1px solid var(--border); border-right: 3px solid var(--ikea-yellow); border-radius: 10px; padding: 16px 20px; margin-bottom: 10px; }
+  .rec-box h4 { font-size: 13px; font-weight: 600; color: var(--ikea-yellow); margin-bottom: 6px; }
+  .rec-box p { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+ 
+  .overview-table { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 40px; }
+  .overview-table table { width: 100%; border-collapse: collapse; }
+  .overview-table th { background: var(--surface2); color: var(--text-dim); font-size: 11px; font-weight: 600; text-transform: uppercase; padding: 10px 16px; text-align: right; border-bottom: 1px solid var(--border); }
+  .overview-table td { padding: 10px 16px; border-bottom: 1px solid rgba(35,40,48,0.5); font-size: 13px; }
+  .overview-table tr:last-child td { border-bottom: none; }
+ 
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+  .footer { text-align: center; padding: 32px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 11px; font-family: var(--mono); }
+  .footer strong { color: var(--text-dim); }
+</style>
+</head>
+<body>
+ 
+<div class="header">
+  <div class="header-top">
+    <div class="ikea-badge">IKEA</div>
+    <div class="report-meta">
+      <span>تاريخ التقرير: 2026-03-31</span>
+      <span>الملف: IKEA_SALES_DATA.xlsx — Sheet3</span>
+      <span>الصفوف المحللة: 1,025 صف حقيقي فقط</span>
+    </div>
+  </div>
+  <h1>🔍 تقرير كشف جودة البيانات — Data Quality Audit</h1>
+  <p>تحليل على 1,025 صف حقيقي (O1001 → O2025) • تم استبعاد الصفوف الفارغة والإحصائية تماماً • بدون أي تعديل على البيانات الأصلية</p>
+</div>
+ 
+<div class="container">
+ 
+  <div class="summary-grid">
+    <div class="kpi-card" style="--card-color:#7a8494">
+      <div class="kpi-value">1,025</div>
+      <div class="kpi-label">صفوف محللة</div>
+      <div class="kpi-sub">30 عمود — O1001→O2025</div>
+    </div>
+    <div class="kpi-card" style="--card-color:var(--green)">
+      <div class="kpi-value">0</div>
+      <div class="kpi-label">قيم مفقودة</div>
+      <div class="kpi-sub">البيانات الحقيقية مكتملة</div>
+    </div>
+    <div class="kpi-card" style="--card-color:var(--red)">
+      <div class="kpi-value">87</div>
+      <div class="kpi-label">تاريخ تسليم خاطئ</div>
+      <div class="kpi-sub">قبل تاريخ الشحن</div>
+    </div>
+    <div class="kpi-card" style="--card-color:var(--orange)">
+      <div class="kpi-value">260</div>
+      <div class="kpi-label">خطأ في حساب Sales</div>
+      <div class="kpi-sub">25.4% من الصفوف</div>
+    </div>
+    <div class="kpi-card" style="--card-color:var(--red)">
+      <div class="kpi-value">26</div>
+      <div class="kpi-label">أرباح سالبة ضخمة</div>
+      <div class="kpi-sub">أقل من −1,000</div>
+    </div>
+  </div>
+ 
+  <!-- CLEAN -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(45,206,114,0.1)">✅</div>
+      <div class="section-title">ما هو نظيف — What's Clean</div>
+      <span class="severity-badge sev-clean">نظيف</span>
+    </div>
+    <div class="clean-box"><span style="font-size:20px">🟢</span><div><div class="clean-text">لا قيم مفقودة (Missing Values)</div><div class="clean-sub">جميع الـ 30 عمود مكتملة في الـ 1,025 صف</div></div></div>
+    <div class="clean-box"><span style="font-size:20px">🟢</span><div><div class="clean-text">لا صفوف مكررة (No Duplicates)</div><div class="clean-sub">كل OrderID فريد، لا تكرار كامل لأي صف</div></div></div>
+    <div class="clean-box"><span style="font-size:20px">🟢</span><div><div class="clean-text">Discount ضمن النطاق الصحيح (0 → 1)</div><div class="clean-sub">جميع قيم الخصم منطقية ومقبولة</div></div></div>
+    <div class="clean-box"><span style="font-size:20px">🟢</span><div><div class="clean-text">Rating مكتمل وضمن النطاق (1 → 5)</div><div class="clean-sub">1,025 قيمة كاملة وصحيحة</div></div></div>
+    <div class="clean-box"><span style="font-size:20px">🟢</span><div><div class="clean-text">ShipDate لا تسبق OrderDate أبداً</div><div class="clean-sub">منطق الشحن بعد الطلب صحيح في كل الصفوف</div></div></div>
+  </div>
+ 
+  <!-- DATE ERRORS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(232,67,67,0.12)">📅</div>
+      <div class="section-title">أخطاء منطق التواريخ — Date Logic Errors</div>
+      <div class="section-count">87 صف</div>
+      <span class="severity-badge sev-critical">حرج</span>
+    </div>
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-red"></span>
+        <span class="issue-title">DeliveryDate قبل ShipDate — مستحيل منطقياً</span>
+        <span class="issue-count-badge">87 صف (8.5%)</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">في 87 صفاً تاريخ التسليم يسبق تاريخ الشحن. بعض الحالات فارقها يوم واحد (ربما خطأ إدخال بسيط)، وأخرى فارقها أكثر من 3 أشهر مما يشير لخلل منهجي في نظام التسجيل.</div>
+        <table class="data-table">
+          <thead><tr><th>OrderID</th><th>OrderDate</th><th>ShipDate</th><th>DeliveryDate</th><th>الفارق</th></tr></thead>
+          <tbody>
+            <tr><td>O1007</td><td>2024-08-26</td><td class="val-warn">2024-08-28</td><td class="val-bad">2024-08-27</td><td class="val-bad">−1 يوم</td></tr>
+            <tr><td>O1104</td><td>2023-04-13</td><td class="val-warn">2023-04-18</td><td class="val-bad">2023-04-16</td><td class="val-bad">−2 يوم</td></tr>
+            <tr><td>O1588</td><td>2025-01-29</td><td class="val-warn">2025-02-06</td><td class="val-bad">2025-01-08</td><td class="val-bad">−29 يوم</td></tr>
+            <tr><td>O1601</td><td>2025-01-16</td><td class="val-warn">2025-01-20</td><td class="val-bad">2025-01-04</td><td class="val-bad">−16 يوم</td></tr>
+            <tr><td>O1613</td><td>2025-04-18</td><td class="val-warn">2025-04-20</td><td class="val-bad">2025-01-02</td><td class="val-bad">−108 يوم</td></tr>
+            <tr><td>O1617</td><td>2025-04-28</td><td class="val-warn">2025-05-08</td><td class="val-bad">2025-01-10</td><td class="val-bad">−118 يوم</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);font-size:11px">... و 81 صفاً أخرى</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- CALC ERRORS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(245,166,35,0.12)">🧮</div>
+      <div class="section-title">أخطاء الحسابات — Calculation Errors</div>
+      <div class="section-count">260 + 26 + 1 صف</div>
+      <span class="severity-badge sev-critical">حرج</span>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-red"></span>
+        <span class="issue-title">Sales لا تتطابق مع: Qty × UnitPrice × (1 − Discount)</span>
+        <span class="issue-count-badge">260 صف (25.4%)</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">ربع الصفوف تقريباً تحتوي على قيمة Sales مختلفة عن الحساب المتوقع. الفروقات تتراوح بين 0.10 و 22.42. قد تكون بسبب خصومات إضافية غير مسجلة، أخطاء تقريب، أو تعديلات يدوية.</div>
+        <table class="data-table">
+          <thead><tr><th>OrderID</th><th>Qty</th><th>UnitPrice</th><th>Discount</th><th>Sales المسجل</th><th>Sales المحسوب</th><th>الفرق</th></tr></thead>
+          <tbody>
+            <tr><td>O1042</td><td>3</td><td>957.28</td><td>5%</td><td>2,727.35</td><td>2,728.25</td><td class="val-bad">0.90</td></tr>
+            <tr><td>O1067</td><td>6</td><td>271.04</td><td>20%</td><td>1,297.90</td><td>1,300.99</td><td class="val-bad">3.09</td></tr>
+            <tr><td>O1126</td><td>7</td><td>271.04</td><td>5%</td><td>1,795.73</td><td>1,802.42</td><td class="val-bad">6.69</td></tr>
+            <tr><td>O1163</td><td>11</td><td>448.33</td><td>5%</td><td>4,662.63</td><td>4,685.05</td><td class="val-bad">22.42</td></tr>
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);font-size:11px">... و 256 صفاً أخرى</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-red"></span>
+        <span class="issue-title">أرباح سالبة ضخمة — تجاوزت −1,000</span>
+        <span class="issue-count-badge">26 صف (2.5%)</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">26 صفاً تحتوي على خسائر تتجاوز −1,000، وأسوأها −37,742. معظمها في منتجات "Tables Model-260" و"Bookcases Model-106" مما يشير لمشكلة في تسعير هذين المنتجين تحديداً.</div>
+        <table class="data-table">
+          <thead><tr><th>OrderID</th><th>المنتج</th><th>Qty</th><th>Sales</th><th>Profit</th></tr></thead>
+          <tbody>
+            <tr><td>O1652</td><td>Tables Model-260</td><td>3</td><td>118,833</td><td class="val-bad">−37,742</td></tr>
+            <tr><td>O1608</td><td>Tables Model-260</td><td>8</td><td>283,526</td><td class="val-bad">−36,798</td></tr>
+            <tr><td>O1721</td><td>Bookcases Model-961</td><td>5</td><td>66,351</td><td class="val-bad">−34,571</td></tr>
+            <tr><td>O1589</td><td>Machines Model-500</td><td>7</td><td>168,926</td><td class="val-bad">−22,601</td></tr>
+            <tr><td>O1587</td><td>Chairs Model-803</td><td>7</td><td>151,523</td><td class="val-bad">−17,616</td></tr>
+            <tr><td>O1762</td><td>Tables Model-260</td><td>1</td><td>38,829</td><td class="val-bad">−17,616</td></tr>
+            <tr><td>O1704</td><td>Chairs Model-550</td><td>1</td><td>29,999</td><td class="val-bad">−13,987</td></tr>
+            <tr><td>O1646</td><td>Chairs Model-803</td><td>1</td><td>33,389</td><td class="val-bad">−13,264</td></tr>
+            <tr><td>O1650</td><td>Phones Model-411</td><td>3</td><td>54,271</td><td class="val-bad">−13,214</td></tr>
+            <tr><td>O1627</td><td>Bookcases Model-106</td><td>1</td><td>38,310</td><td class="val-bad">−10,292</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);font-size:11px">... و 16 صفاً أخرى</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-orange"></span>
+        <span class="issue-title">Profit Outlier شديد الارتفاع — قيمة استثنائية</span>
+        <span class="issue-count-badge">1 صف</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">صف واحد يحتوي على ربح +264,848 يتجاوز الحد الأعلى بـ 3 أضعاف IQR. هذه القيمة بعيدة جداً عن متوسط الربح (~845) وستؤثر على أي تحليل إحصائي.</div>
+        <table class="data-table">
+          <thead><tr><th>OrderID</th><th>المنتج</th><th>Sales</th><th>Profit</th><th>الوضع</th></tr></thead>
+          <tbody>
+            <tr><td>O1597</td><td>Phones Model-880</td><td>405,219</td><td class="val-bad">264,848</td><td><span class="severity-badge sev-critical">Extreme Outlier (3× IQR)</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- CATEGORIES -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(245,166,35,0.12)">🏷️</div>
+      <div class="section-title">تضارب القيم الفئوية — Category Inconsistencies</div>
+      <div class="section-count">عمودان متأثران</div>
+      <span class="severity-badge sev-warning">تحذير</span>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-orange"></span>
+        <span class="issue-title">Region: خلط بين أسماء جغرافية واتجاهات فضفاضة</span>
+        <span class="issue-count-badge">440 صف مشكوك (42.9%)</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">العمود يجمع بين نمطين: أسماء مناطق محددة (North America, Europe) وأسماء اتجاهات مبهمة (North, South, East, West). هذا يجعل أي تحليل جغرافي غير موثوق.</div>
+        <table class="data-table">
+          <thead><tr><th>القيمة</th><th>النوع</th><th>العدد</th><th>المشكلة</th></tr></thead>
+          <tbody>
+            <tr><td>North America</td><td class="val-ok">✅ محدد</td><td>173</td><td class="val-ok">طبيعي</td></tr>
+            <tr><td>Asia</td><td class="val-ok">✅ محدد</td><td>162</td><td class="val-ok">طبيعي</td></tr>
+            <tr><td class="val-bad">West</td><td class="val-bad">⚠️ اتجاه</td><td>158</td><td class="val-bad">غرب أين؟</td></tr>
+            <tr><td>Europe</td><td class="val-ok">✅ محدد</td><td>151</td><td class="val-ok">طبيعي</td></tr>
+            <tr><td class="val-bad">North</td><td class="val-bad">⚠️ اتجاه</td><td>104</td><td class="val-bad">شمال أين؟</td></tr>
+            <tr><td class="val-bad">East</td><td class="val-bad">⚠️ اتجاه</td><td>94</td><td class="val-bad">شرق أين؟</td></tr>
+            <tr><td class="val-bad">South</td><td class="val-bad">⚠️ اتجاه</td><td>84</td><td class="val-bad">جنوب أين؟</td></tr>
+            <tr><td>Oceania</td><td class="val-ok">✅ محدد</td><td>75</td><td class="val-ok">طبيعي</td></tr>
+            <tr><td>Middle East</td><td class="val-ok">✅ محدد</td><td>24</td><td class="val-ok">طبيعي</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-orange"></span>
+        <span class="issue-title">ShipMode: قيم قد تكون مكررة بأسماء مختلفة</span>
+        <span class="issue-count-badge">181 صف محتمل</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">"Standard" و"Standard Class" قد يكونا نفس الفئة (250 صف إجمالاً). كذلك "Express" قد تكون نفس "First Class". هذا يؤثر على تحليل أداء الشحن.</div>
+        <table class="data-table">
+          <thead><tr><th>القيمة</th><th>العدد</th><th>الملاحظة</th></tr></thead>
+          <tbody>
+            <tr><td>Same Day</td><td>295</td><td class="val-ok">✅ واضح</td></tr>
+            <tr><td>First Class</td><td>247</td><td class="val-warn">⚠️ نفس Express؟</td></tr>
+            <tr><td class="val-bad">Standard Class</td><td>154</td><td class="val-bad">⚠️ نفس Standard؟</td></tr>
+            <tr><td>Second Class</td><td>148</td><td class="val-ok">✅ واضح</td></tr>
+            <tr><td class="val-bad">Standard</td><td>96</td><td class="val-bad">⚠️ نفس Standard Class؟</td></tr>
+            <tr><td class="val-warn">Express</td><td>85</td><td class="val-warn">⚠️ نفس First Class؟</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ADDITIONAL -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:rgba(74,158,255,0.1)">🔎</div>
+      <div class="section-title">ملاحظات إضافية — Additional Findings</div>
+      <span class="severity-badge sev-warning">تحذير / معلومة</span>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-orange"></span>
+        <span class="issue-title">Margin: 33 قيمة سالبة وبعضها يتجاوز −100%</span>
+        <span class="issue-count-badge">33 صف</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">33 صفاً تحتوي على هامش ربح سالب، وبعضها يصل إلى −13.38 (خسارة تعادل 1338% من السعر). مرتبطة بصفوف الأرباح السالبة الضخمة.</div>
+        <table class="data-table">
+          <thead><tr><th>OrderID</th><th>Margin</th><th>Profit</th><th>الوضع</th></tr></thead>
+          <tbody>
+            <tr><td>O1004</td><td class="val-warn">−0.19</td><td class="val-warn">−15.02</td><td><span class="severity-badge sev-warning">هامش سالب بسيط</span></td></tr>
+            <tr><td>O1023</td><td class="val-bad">−11.32</td><td class="val-warn">−1.13</td><td><span class="severity-badge sev-critical">يتجاوز −100%</span></td></tr>
+            <tr><td>O1587</td><td class="val-bad">−11.63</td><td class="val-bad">−17,616</td><td><span class="severity-badge sev-critical">يتجاوز −100%</span></td></tr>
+            <tr><td>O1589</td><td class="val-bad">−13.38</td><td class="val-bad">−22,601</td><td><span class="severity-badge sev-critical">يتجاوز −100%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-blue"></span>
+        <span class="issue-title">أسماء منتجات مختلطة: IKEA حقيقية مع Model-xxx تجريبية</span>
+        <span class="issue-count-badge">440 صف تجريبي (42.9%)</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">585 صف بأسماء IKEA حقيقية (KIVIK Sofa, KALLAX Shelf) و440 صف بأسماء عامة (Chairs Model-803, Tables Model-260). يشير إلى خلط بين بيانات حقيقية ومولّدة.</div>
+        <table class="data-table">
+          <thead><tr><th>النوع</th><th>العدد</th><th>مثال</th></tr></thead>
+          <tbody>
+            <tr><td class="val-ok">أسماء IKEA حقيقية</td><td>585</td><td>KIVIK Sofa, KALLAX Shelf, OFTAST Plate</td></tr>
+            <tr><td class="val-bad">أسماء عامة / تجريبية</td><td>440</td><td>Chairs Model-803, Tables Model-260</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+ 
+    <div class="issue-card">
+      <div class="issue-card-header" onclick="toggle(this)">
+        <span class="issue-dot dot-blue"></span>
+        <span class="issue-title">Margin: صيغة الحساب غير موثقة</span>
+        <span class="issue-count-badge">معلومة</span>
+        <span class="issue-toggle">▼</span>
+      </div>
+      <div class="issue-body">
+        <div class="issue-desc">عمود Margin لا يتبع الصيغة الأكثر شيوعاً (UnitPrice − CostPrice) / UnitPrice. قد يكون محسوباً على مستوى الصفقة لا الوحدة، لكن التعريف المستخدم غير موثق.</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- SUMMARY TABLE -->
+  <div class="divider"></div>
+  <h2 style="font-size:18px;font-weight:700;margin-bottom:20px;color:var(--ikea-yellow)">📋 ملخص إجمالي — Full Audit Summary</h2>
+  <div class="overview-table">
+    <table>
+      <thead><tr><th>#</th><th>نوع المشكلة</th><th>عدد السجلات</th><th>النسبة</th><th>الخطورة</th><th>الأولوية</th></tr></thead>
+      <tbody>
+        <tr><td style="font-family:var(--mono)">1</td><td>DeliveryDate قبل ShipDate</td><td class="val-bad" style="font-family:var(--mono)">87</td><td style="font-family:var(--mono)">8.5%</td><td><span class="severity-badge sev-critical">حرج</span></td><td style="color:var(--red)">🔴 فوري</td></tr>
+        <tr><td style="font-family:var(--mono)">2</td><td>Sales لا تتطابق مع الصيغة الحسابية</td><td class="val-bad" style="font-family:var(--mono)">260</td><td style="font-family:var(--mono)">25.4%</td><td><span class="severity-badge sev-critical">حرج</span></td><td style="color:var(--red)">🔴 فوري</td></tr>
+        <tr><td style="font-family:var(--mono)">3</td><td>أرباح سالبة ضخمة (أقل من −1,000)</td><td class="val-bad" style="font-family:var(--mono)">26</td><td style="font-family:var(--mono)">2.5%</td><td><span class="severity-badge sev-critical">حرج</span></td><td style="color:var(--red)">🔴 مراجعة</td></tr>
+        <tr><td style="font-family:var(--mono)">4</td><td>Profit Outlier شديد الارتفاع</td><td class="val-warn" style="font-family:var(--mono)">1</td><td style="font-family:var(--mono)">0.1%</td><td><span class="severity-badge sev-warning">تحذير</span></td><td style="color:var(--orange)">🟡 مراجعة</td></tr>
+        <tr><td style="font-family:var(--mono)">5</td><td>Region: تسميات غير متسقة</td><td class="val-warn" style="font-family:var(--mono)">440</td><td style="font-family:var(--mono)">42.9%</td><td><span class="severity-badge sev-warning">تحذير</span></td><td style="color:var(--orange)">🟡 توحيد</td></tr>
+        <tr><td style="font-family:var(--mono)">6</td><td>ShipMode: قيم مزدوجة محتملة</td><td class="val-warn" style="font-family:var(--mono)">181</td><td style="font-family:var(--mono)">17.7%</td><td><span class="severity-badge sev-warning">تحذير</span></td><td style="color:var(--orange)">🟡 توحيد</td></tr>
+        <tr><td style="font-family:var(--mono)">7</td><td>Margin: قيم سالبة غير طبيعية</td><td class="val-warn" style="font-family:var(--mono)">33</td><td style="font-family:var(--mono)">3.2%</td><td><span class="severity-badge sev-warning">تحذير</span></td><td style="color:var(--orange)">🟡 مراجعة</td></tr>
+        <tr><td style="font-family:var(--mono)">8</td><td>أسماء منتجات مختلطة (حقيقية + تجريبية)</td><td style="font-family:var(--mono)">440</td><td style="font-family:var(--mono)">42.9%</td><td><span class="severity-badge sev-info">معلومة</span></td><td style="color:var(--green)">🟢 للمراجعة</td></tr>
+        <tr><td style="font-family:var(--mono)">9</td><td>Margin: صيغة حساب غير موثقة</td><td style="font-family:var(--mono)">—</td><td style="font-family:var(--mono)">—</td><td><span class="severity-badge sev-info">معلومة</span></td><td style="color:var(--green)">🟢 توثيق</td></tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <h2 style="font-size:18px;font-weight:700;margin:32px 0 16px;color:var(--ikea-yellow)">✅ التوصيات — Recommendations</h2>
+  <div class="rec-box"><h4>1. تصحيح تواريخ التسليم (87 صفاً)</h4><p>راجع الـ 87 صفاً التي DeliveryDate فيها قبل ShipDate. الحالات ذات فارق يوم أو يومين ربما أخطاء إدخال بسيطة، بينما الحالات ذات فارق أشهر تشير لخلل منهجي.</p></div>
+  <div class="rec-box"><h4>2. مراجعة معادلة حساب Sales (260 صفاً)</h4><p>تحقق من 260 صفاً حيث Sales ≠ Quantity × UnitPrice × (1 − Discount). إما أن تُوثَّق الخصومات الإضافية أو يُصحَّح الحساب في المصدر.</p></div>
+  <div class="rec-box"><h4>3. التحقق من الأرباح السالبة الضخمة (26 صفاً)</h4><p>راجع كل صف بخسارة تتجاوز −1,000. تركّزها في "Tables Model-260" يشير لمشكلة في تسعير هذا المنتج تحديداً — هل مرتجعات؟ أخطاء تسعير؟</p></div>
+  <div class="rec-box"><h4>4. توحيد قيم Region وShipMode</h4><p>أنشئ قائمة مرجعية موحدة وطبّق validation rules لمنع إدخال قيم غير معيارية مستقبلاً.</p></div>
+  <div class="rec-box"><h4>5. التحقق من O1597 (Profit = +264,848)</h4><p>صف واحد لكنه شديد الاستثنائية — تحقق منه قبل أي تحليل إحصائي لأنه سيؤثر على المتوسطات بشكل كبير.</p></div>
+ 
+</div>
+ 
+<div class="footer">
+  <strong>IKEA Sales Data — Data Quality Audit Report</strong><br>
+  تحليل على 1,025 صف حقيقي فقط (O1001 → O2025) • لم يتم تعديل أي بيانات أصلية • 30 عمود
+</div>
+ 
+<script>
+  function toggle(header) {
+    const body = header.nextElementSibling;
+    const tog = header.querySelector('.issue-toggle');
+    body.classList.toggle('open');
+    tog.classList.toggle('open');
+  }
+</script>
+</body>
+</html>
